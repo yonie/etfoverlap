@@ -18,7 +18,7 @@
 <body>
     <div class="container">
         <h1>ETF Overlap Analyzer</h1>
-
+        <div><p>This tool analyzes the overlap between ETFs by examining their stock holdings. To achieve this, data is used from <a href="https://justetf.com">justetf.com</a>. To prevent hammering, data is cached for 24 hours.</p></div>
         <div>
             <h3>Enter ETF ISINs (one per line):</h3>
             <textarea id="isins" placeholder="IE00B4L5Y983&#10;IE00B3RBWM25&#10;IE00BK5BQT80"></textarea>
@@ -36,17 +36,17 @@
             <div id="summary"></div>
 
             <div class="chart-container">
-                <h3>Stock Concentration</h3>
+                <h3>Stock concentration</h3>
                 <canvas id="concentration-chart"></canvas>
             </div>
 
             <div class="chart-container">
-                <h3>Weight Distribution</h3>
+                <h3>Weight distribution</h3>
                 <canvas id="weight-chart"></canvas>
             </div>
 
             <div>
-                <h3>Detailed Breakdown</h3>
+                <h3>Detailed breakdown</h3>
                 <div id="breakdown"></div>
             </div>
         </div>
@@ -129,10 +129,17 @@
 
                 // Display summary
                 const summary = document.getElementById('summary');
+                const etfList = data.etfs.map(etf =>
+                    `<li><strong>${etf.name}</strong> (${etf.isin})</li>`
+                ).join('');
+                
                 summary.innerHTML = `
-                    <p><strong>ETFs Analyzed:</strong> ${data.summary.total_etfs}</p>
-                    <p><strong>Total Unique Stocks:</strong> ${data.summary.total_unique_stocks}</p>
-                    <p><strong>Average Overlap:</strong> ${data.summary.average_overlap_percentage.toFixed(2)}%</p>
+                    <p><strong>ETFs analyzed:</strong> ${data.summary.total_etfs}</p>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        ${etfList}
+                    </ul>
+                    <p><strong>Total unique stocks observed:</strong> ${data.summary.total_unique_stocks}</p>
+                    <p><strong>Average overlap:</strong> ${data.summary.average_overlap_percentage.toFixed(2)}%</p>
                 `;
 
                 // Destroy existing charts before creating new ones

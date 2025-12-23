@@ -332,10 +332,10 @@ class ReportGenerator:
                 stock_appearances[isin] += 1
                 stock_total_weights[isin] += holding['weight']
 
-        # Create sorted list of stocks by appearance count and total weight
+        # Create sorted list of stocks by total weight (primary) and appearance count (secondary)
         stocks_by_appearance = sorted(
             stock_appearances.items(),
-            key=lambda x: (-x[1], -stock_total_weights[x[0]])
+            key=lambda x: (-stock_total_weights[x[0]], -x[1])
         )
 
         # Generate clean JSON output
@@ -518,10 +518,10 @@ XX Look for ETFs with different sector/geographic focus."""
                     "weight": holding['weight']
                 })
 
-        # Create sorted list of stocks by appearance count and total weight
+        # Create sorted list of stocks by total weight (primary) and appearance count (secondary)
         stocks_by_appearance = sorted(
             stock_appearances.items(),
-            key=lambda x: (-x[1], -stock_total_weights[x[0]])
+            key=lambda x: (-stock_total_weights[x[0]], -x[1])
         )
 
         # Build analysis

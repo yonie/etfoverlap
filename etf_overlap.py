@@ -30,6 +30,25 @@ JUSTETF_URL = 'https://www.justetf.com/en/etf-profile.html?isin={}&tab=analyses'
 # OPTIMIZATION: Pre-compile regex patterns for better performance
 import re
 WEIGHT_CLEAN_PATTERN = re.compile(r'[^\d.]')
+ISIN_PATTERN = re.compile(r'^[A-Z]{2}[A-Z0-9]{9}[0-9]$')
+
+def validate_isin(isin: str) -> bool:
+    """
+    Validate ISIN format to prevent injection attacks.
+    ISIN format: 2 letter country code + 9 alphanumeric + 1 check digit
+    Example: IE00B4L5Y983
+    """
+    if not isinstance(isin, str):
+        return False
+    
+    # Remove whitespace and convert to uppercase
+    isin = isin.strip().upper()
+    
+    # Check format
+    if not ISIN_PATTERN.match(isin):
+        return False
+    
+    return True
 
 class ETFData:
     """Data structure for ETF holdings"""
@@ -576,10 +595,27 @@ def main():
             print("Cache expired.")
 
         if args.isin1 and args.isin2:
+            # SECURITY: Validate ISINs
+            if not validate_isin(args.isin1):
+                error_response = {
+                    "error": f"Invalid ISIN format: {args.isin1}. ISINs must be exactly 12 characters (2 letters + 9 alphanumeric + 1 digit).",
+                    "status": "failed"
+                }
+                print(json.dumps(error_response, indent=2))
+                return 1
+            
+            if not validate_isin(args.isin2):
+                error_response = {
+                    "error": f"Invalid ISIN format: {args.isin2}. ISINs must be exactly 12 characters (2 letters + 9 alphanumeric + 1 digit).",
+                    "status": "failed"
+                }
+                print(json.dumps(error_response, indent=2))
+                return 1
+            
             # Analyze two ETFs - act as a proper backend service
             try:
-                etf1 = fetcher.fetch_etf_data(args.isin1)
-                etf2 = fetcher.fetch_etf_data(args.isin2)
+                etf1 = fetcher.fetch_etf_data(args.isin1.strip().upper())
+                etf2 = fetcher.fetch_etf_data(args.isin2.strip().upper())
                 result = calculator.calculate_overlap(etf1, etf2)
 
                 # Always output clean JSON - this is a backend service
@@ -614,7 +650,25 @@ def main():
 
         elif args.multi:
             # Analyze multiple ETFs - act as a proper backend service
-            isins = [i.strip() for i in args.multi.split(',')]
+            raw_isins = [i.strip() for i in args.multi.split(',')]
+            
+            # SECURITY: Validate all ISINs first
+            invalid_isins = []
+            isins = []
+            for isin in raw_isins:
+                isin_cleaned = isin.strip().upper()
+                if validate_isin(isin_cleaned):
+                    isins.append(isin_cleaned)
+                else:
+                    invalid_isins.append(isin)
+            
+            if invalid_isins:
+                error_response = {
+                    "error": f"Invalid ISIN format detected. ISINs must be exactly 12 characters (2 letters + 9 alphanumeric + 1 digit). Invalid: {', '.join(invalid_isins)}",
+                    "status": "failed"
+                }
+                print(json.dumps(error_response, indent=2))
+                return 1
 
             # Try to fetch all ETFs, but continue with valid ones if some fail
             etfs = []

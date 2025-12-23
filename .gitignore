@@ -1,2 +1,18 @@
+# Database cache
 etf_cache.db
-etf_cache.db
+
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv

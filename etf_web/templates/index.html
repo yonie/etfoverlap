@@ -55,6 +55,14 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // ISIN validation regex: exactly 12 chars, format: CC[A-Z0-9]{9}[0-9]
+            const ISIN_PATTERN = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
+
+            function validateISIN(isin) {
+                const cleaned = isin.trim().toUpperCase();
+                return ISIN_PATTERN.test(cleaned);
+            }
+
             // Load example ISINs
             document.getElementById('example-btn').addEventListener('click', function() {
                 document.getElementById('isins').value =
@@ -63,14 +71,34 @@
 
             // Analyze button
             document.getElementById('analyze-btn').addEventListener('click', async function() {
-                const isins = document.getElementById('isins').value
+                const rawIsins = document.getElementById('isins').value
                     .split('\n')
                     .filter(isin => isin.trim() !== '');
 
-                if (isins.length < 2) {
+                if (rawIsins.length < 2) {
                     showError('Please enter at least 2 ETF ISINs');
                     return;
                 }
+
+                // Validate all ISINs before sending
+                const invalidIsins = [];
+                const validIsins = [];
+                
+                rawIsins.forEach(isin => {
+                    const cleaned = isin.trim().toUpperCase();
+                    if (validateISIN(cleaned)) {
+                        validIsins.push(cleaned);
+                    } else {
+                        invalidIsins.push(isin);
+                    }
+                });
+
+                if (invalidIsins.length > 0) {
+                    showError(`Invalid ISIN format detected. ISINs must be exactly 12 characters (2 letters + 9 alphanumeric + 1 digit).\nInvalid: ${invalidIsins.join(', ')}`);
+                    return;
+                }
+
+                const isins = validIsins;
 
                 showLoading(true);
                 hideError();

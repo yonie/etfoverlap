@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ETF Overlap Analyzer</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        textarea { width: 100%; height: 100px; margin-bottom: 10px; }
+        button { padding: 8px 16px; background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        #results { margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .chart-container { margin: 20px 0; }
+        canvas { max-width: 100%; }
+        .hidden { display: none; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ETF Overlap Analyzer</h1>
+
+        <div>
+            <h3>Enter ETF ISINs (one per line):</h3>
+            <textarea id="isins" placeholder="IE00B4L5Y983&#10;IE00B3RBWM25&#10;IE00BK5BQT80"></textarea>
+            <div>
+                <button id="analyze-btn">Analyze</button>
+                <button id="example-btn">Load Examples</button>
+            </div>
+        </div>
+
+        <div id="loading" class="hidden">Analyzing... please wait</div>
+        <div id="error" class="error hidden"></div>
+
+        <div id="results" class="hidden">
+            <h2>Analysis Results</h2>
+            <div id="summary"></div>
+
+            <div class="chart-container">
+                <h3>Stock Concentration</h3>
+                <canvas id="concentration-chart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <h3>Weight Distribution</h3>
+                <canvas id="weight-chart"></canvas>
+            </div>
+
+            <div>
+                <h3>Detailed Breakdown</h3>
+                <div id="breakdown"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load example ISINs
+            document.getElementById('example-btn').addEventListener('click', function() {
+                document.getElementById('isins').value =
+                    'IE00B4L5Y983\nIE00B3RBWM25\nIE00BK5BQT80';
+            });
+
+            // Analyze button
+            document.getElementById('analyze-btn').addEventListener('click', async function() {
+                const isins = document.getElementById('isins').value
+                    .split('\n')
+                    .filter(isin => isin.trim() !== '');
+
+                if (isins.length < 2) {
+                    showError('Please enter at least 2 ETF ISINs');
+                    return;
+                }
+
+                showLoading(true);
+                hideError();
+                hideResults();
+
+                try {
+                    const response = await fetch('/api/analyze', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({isins})
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Analysis failed');
+                    }
+
+                    const data = await response.json();
+                    displayResults(data);
+                } catch (error) {
+                    showError(error.message);
+                    console.error('Analysis failed:', error);
+                } finally {
+                    showLoading(false);
+                }
+            });
+
+            function showLoading(show) {
+                document.getElementById('loading').classList.toggle('hidden', !show);
+            }
+
+            function showError(message) {
+                const errorDiv = document.getElementById('error');
+                errorDiv.textContent = message;
+                errorDiv.classList.remove('hidden');
+            }
+
+            function hideError() {
+                document.getElementById('error').classList.add('hidden');
+            }
+
+            function hideResults() {
+                document.getElementById('results').classList.add('hidden');
+            }
+
+            // Global chart instances for cleanup
+            let concentrationChart = null;
+            let weightChart = null;
+
+            function displayResults(apiResponse) {
+                // Extract the actual data from the API response wrapper
+                const data = apiResponse.data;
+
+                // Show results section
+                document.getElementById('results').classList.remove('hidden');
+
+                // Display summary
+                const summary = document.getElementById('summary');
+                summary.innerHTML = `
+                    <p><strong>ETFs Analyzed:</strong> ${data.summary.total_etfs}</p>
+                    <p><strong>Total Unique Stocks:</strong> ${data.summary.total_unique_stocks}</p>
+                    <p><strong>Average Overlap:</strong> ${data.summary.average_overlap_percentage.toFixed(2)}%</p>
+                `;
+
+                // Destroy existing charts before creating new ones
+                if (concentrationChart) concentrationChart.destroy();
+                if (weightChart) weightChart.destroy();
+
+                // Create concentration chart
+                concentrationChart = createConcentrationChart(data.stock_overlap_analysis);
+
+                // Create weight distribution chart
+                weightChart = createWeightChart(data.stock_overlap_analysis);
+
+                // Create detailed breakdown
+                createBreakdownTable(data.stock_overlap_analysis, data.summary.total_etfs);
+            }
+
+            function createConcentrationChart(stocks) {
+                const ctx = document.getElementById('concentration-chart').getContext('2d');
+                return new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: stocks.map(s => s.name || s.isin),
+                        datasets: [{
+                            label: 'Number of ETFs',
+                            data: stocks.map(s => s.appears_in_etfs),
+                            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {y: {beginAtZero: true}}
+                    }
+                });
+            }
+
+            function createWeightChart(stocks) {
+                const ctx = document.getElementById('weight-chart').getContext('2d');
+                return new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: stocks.map(s => s.name || s.isin),
+                        datasets: [{
+                            label: 'Total Weight Across All ETFs',
+                            data: stocks.map(s => s.total_weight_across_all_etfs),
+                            backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {y: {beginAtZero: true}}
+                    }
+                });
+            }
+
+            function createBreakdownTable(stocks, totalEtfs) {
+                const breakdown = document.getElementById('breakdown');
+                let html = '<table border="1" cellpadding="5" style="width: 100%; border-collapse: collapse;">';
+                html += '<tr><th>Stock</th><th>ISIN</th><th>ETFs</th><th>Total Weight</th><th>Details</th></tr>';
+
+                stocks.forEach(stock => {
+                    html += `<tr>
+                        <td><strong>${stock.name}</strong></td>
+                        <td style="font-size: 0.9em; color: #666;">${stock.isin}</td>
+                        <td>${stock.appears_in_etfs}/${totalEtfs}</td>
+                        <td>${stock.total_weight_across_all_etfs.toFixed(2)}%</td>
+                        <td>
+                            <ul style="margin: 0; padding-left: 20px;">
+                                ${stock.etf_breakdown.map(etf => `
+                                    <li>${etf.etf_name}: ${etf.weight.toFixed(2)}%</li>
+                                `).join('')}
+                            </ul>
+                        </td>
+                    </tr>`;
+                });
+
+                html += '</table>';
+                breakdown.innerHTML = html;
+            }
+        });
+    </script>
+</body>
+</html>

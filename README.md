@@ -2,6 +2,8 @@
 
 **Analyze overlap between ETFs to identify concentration risks and improve portfolio diversification.**
 
+![Screenshot of ETF Overlap Analysis](screenshot.png)
+
 ## 🚀 Quick Start
 
 ### Console Tool
